@@ -1,8 +1,10 @@
 ---
 name: conventional-commit
-description: Generate a Conventional Commits format message based on git diff
+description: Generate a Conventional Commits format message based on git diff. Use this skill whenever the user wants to commit, asks for a commit message, says /commit, or mentions conventional commits.
 allowed-tools:
   - Bash(git add:*)
+  - Bash(git commit:*)
+  - Bash(git push:*)
   - Bash(git status:*)
   - Bash(git diff:*)
   - Bash(git log:*)
@@ -14,11 +16,9 @@ disable-model-invocation: true
 
 Dynamic git state information:
 
-- Current git status: !`git status`
-- Staged changes: !`git diff --cached`
-- Unstaged changes: !`git diff`
-- Modified files: !`git diff --name-only HEAD`
-- Untracked files: !`git ls-files --others --exclude-standard`
+- Current git status: !`git status --short`
+- Staged changes: !`git diff --cached --stat`
+- Changed and untracked files: !`git diff --name-only HEAD && git ls-files --others --exclude-standard`
 - Recent commits (for style reference): !`git log --oneline -5`
 - Current branch: !`git branch --show-current`
 
@@ -145,23 +145,13 @@ Before presenting the message, auto-stage both modified and new files:
 - Stage each file individually with specific paths
 
 **Untracked new files:**
-- Get list from `git ls-files --others --exclude-standard`
-- Analyze file paths to identify files related to the current change
-- Stage relevant new files that are part of the same feature/fix
+- Do NOT auto-stage untracked files. Instead, list them and ask the user which ones to include.
+- Display: "Untracked files found:\n- [list]\nWould you like to include any of these in this commit?"
 
 **General rules:**
-- **Use specific file paths** - never use `git add -A` or `git add .`
+- **Use specific file paths** — never use `git add -A` or `git add .`
 - **Exclude secret files**: .env, .env.*, credentials.json, *.key, *.pem, *secret*, *password*
-- **Exclude non-code files unless relevant**: Large binaries, build artifacts (unless the commit is specifically about them)
-
-**Identifying related untracked files:**
-- Same directory structure as modified files
-- Same feature/component name patterns
-- Supporting files for new functionality (e.g., if adding `FeatureContext.tsx`, also stage related `FeatureProvider.tsx`, `useFeature.tsx`, etc.)
-
-If secret files are detected:
-- Display warning: "Detected potential secret files: [list]. These will NOT be staged."
-- Proceed with other files only
+- If secret files are detected, warn: "Detected potential secret files: [list]. These will NOT be staged."
 
 #### 7. Present Message to User
 
@@ -195,28 +185,18 @@ Would you like me to:
 After user reviews the message:
 
 **If user approves:**
-- Execute commit using HEREDOC format for message preservation
-- Do not include `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>` footer
-- Confirm commit was created successfully
-- Display: `git log -1 --pretty=%B` to show committed message
+- Execute: `git commit -m "<type>[scope]: <description>"`
+- Do not include `Co-Authored-By` footer
+- Confirm with: `git log -1 --pretty=%B`
 
 **If user provides different message:**
 - Use their message exactly as provided
 - Do not include `Co-Authored-By` footer
-- Execute commit
 
 **If user requests changes:**
 - Regenerate message with requested modifications
 - Present new message for review
 - Wait for approval again
-
-**Commit command format:**
-```bash
-git commit -m "$(cat <<'EOF'
-<type>[scope]: <description>
-EOF
-)"
-```
 
 ## Edge Cases
 
