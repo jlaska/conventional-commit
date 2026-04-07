@@ -21,10 +21,28 @@ Dynamic git state information:
 - Changed and untracked files: !`git diff --name-only HEAD && git ls-files --others --exclude-standard`
 - Recent commits (for style reference): !`git log --oneline -5`
 - Current branch: !`git branch --show-current`
+- Commitlint configuration (if present): !`cat .commitlintrc.yaml .commitlintrc.yml .commitlintrc.json .commitlintrc .commitlintrc.js commitlint.config.js commitlint.config.ts commitlint.config.mjs 2>/dev/null || echo "No commitlint config found"`
 
 ## Your Task
 
 Generate a git commit message following the [Conventional Commits specification](https://www.conventionalcommits.org) based on the current changes, then present it to the user for review before committing.
+
+## Commitlint Configuration
+
+If a commitlint config was found in the Context section above, parse it and apply any enforced rules (severity level `2`) to override the defaults in this skill. Rules with severity `0` are disabled — ignore them. Rules with severity `1` are warnings — treat as soft guidance only.
+
+Extract and apply these rules if present:
+
+- **`type-enum`**: Use only the listed types instead of the Core Types below
+- **`scope-enum`**: Restrict scope to only the listed values when choosing auto-detected scope
+- **`scope-empty`**: If set to `[2, "never"]`, scope is required — always include one; if `[2, "always"]`, omit scope entirely
+- **`header-max-length`**: Use this character limit for the full header (`type(scope): description`) instead of the 50-72 char guidance
+- **`subject-case`**: Enforce the specified case style on the description (e.g., `lower-case` = start with lowercase, `sentence-case` = capitalize first letter)
+- **`body-max-line-length`**: Use this value for body line wrapping instead of the default 72 chars
+
+When the commitlint config `extends` a preset (e.g., `@commitlint/config-conventional`), treat that preset's defaults as the baseline and apply any local `rules` overrides on top.
+
+When no commitlint config is found, use the hardcoded defaults throughout this skill — no behavior change.
 
 ## User Arguments
 
@@ -55,6 +73,8 @@ The user invoked this command with: $ARGUMENTS
 - `ci` - CI configuration
 - `chore` - Maintenance tasks, dependencies
 - `revert` - Revert previous commit
+
+**Commitlint override:** If the commitlint config enforces a `type-enum` rule, use only the types from that list. The list above is the default when no config is present.
 
 ### Breaking Changes
 
@@ -103,6 +123,8 @@ Automatically infer scope from file paths:
 
 **User override:** If user provided scope argument, use it instead of auto-detection.
 
+**Commitlint override:** If the commitlint config enforces a `scope-enum` rule, restrict auto-detected scope to only the listed values — omit scope if the inferred value isn't in the list. If `scope-empty` is enforced as `[2, "never"]`, scope is required; always include one even if unclear.
+
 **Common scopes:**
 - `deps` - Dependency updates
 - `api` - API changes
@@ -129,6 +151,8 @@ Create a concise description following these rules:
 - **Length**: 50-72 characters ideal
 - **Specific**: Mention what changed, not why or how
 - **Concise**: Remove unnecessary words
+
+**Commitlint override:** If the commitlint config specifies `header-max-length`, use that value as the character limit for the full header line. If `subject-case` is enforced, apply that case rule to the description (e.g., `lower-case` means no capital after the colon, `sentence-case` means capitalize the first word).
 
 **Examples:**
 - ✅ `feat(api): add user authentication endpoint`
@@ -252,10 +276,12 @@ After user reviews the message:
 ## Success Criteria
 
 - ✅ Message displayed before committing (two-phase interaction)
-- ✅ Format follows Conventional Commits specification
-- ✅ Type accurately reflects changes
-- ✅ Scope is meaningful or omitted appropriately
+- ✅ Format follows Conventional Commits specification (or commitlint config when present)
+- ✅ Type accurately reflects changes (and is within commitlint `type-enum` if enforced)
+- ✅ Scope is meaningful or omitted appropriately (and within commitlint `scope-enum` if enforced)
 - ✅ Description uses imperative mood and is concise
+- ✅ Header respects commitlint `header-max-length` when configured
+- ✅ Subject case matches commitlint `subject-case` rule when enforced
 - ✅ Files auto-staged selectively (not git add -A)
 - ✅ Secret files excluded from staging
 - ✅ User argument overrides work correctly
