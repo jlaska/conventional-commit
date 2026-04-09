@@ -2,6 +2,7 @@
 name: conventional-commit
 description: Generate a Conventional Commits format message based on git diff. Use this skill whenever the user wants to commit, asks for a commit message, says /commit, or mentions conventional commits.
 allowed-tools:
+  - AskUserQuestion
   - Bash(git add:*)
   - Bash(git commit:*)
   - Bash(git push:*)
@@ -146,8 +147,31 @@ Before presenting the message, auto-stage both modified and new files:
 - Stage each file individually with specific paths
 
 **Untracked new files:**
-- Do NOT auto-stage untracked files. Instead, list them and ask the user which ones to include.
-- Display: "Untracked files found:\n- [list]\nWould you like to include any of these in this commit?"
+- Do NOT auto-stage untracked files. Instead, use `AskUserQuestion` to ask the user which ones to include.
+- Filter out secret files (see rules below) before building the options list.
+
+**If 4 or fewer untracked files remain after filtering:**
+
+Use `AskUserQuestion` with:
+- header: "Stage files"
+- question: "Untracked files found. Which should be included in this commit?"
+- multiSelect: true
+- options: one option per file — label is the basename (or shortest unique path ≤5 words), description is the full relative path
+
+Stage only the files the user selects. If the user selects "Other", treat their text as a list of file paths to stage.
+
+**If more than 4 untracked files remain after filtering:**
+
+Use `AskUserQuestion` with:
+- header: "Stage files"
+- question: "N untracked files found:\n- [list all files]\nWhich would you like to include?"
+- multiSelect: false
+- options:
+  - label: "All", description: "Stage all untracked files listed above"
+  - label: "None", description: "Skip all untracked files"
+  - label: "Some", description: "I will specify which files to include"
+
+If user selects "All", stage all listed untracked files. If "None", skip them. If "Some" or "Other", treat the user's text response as file paths to stage.
 
 **General rules:**
 - **Use specific file paths** — never use `git add -A` or `git add .`
@@ -167,15 +191,17 @@ Generated Conventional Commit message:
 
 Files staged (X total):
 - [list of staged files]
-
-To commit with this message, I can run:
-git commit -m "[full message]"
-
-Would you like me to:
-1. Commit with this message
-2. Commit and push with this message
-3. Discuss the message
 ```
+
+Then use `AskUserQuestion` to ask the user how to proceed:
+
+- header: "Action"
+- question: "How would you like to proceed with the commit message above?"
+- multiSelect: false
+- options:
+  - label: "Commit", description: "Commit staged changes with the generated message"
+  - label: "Commit and push", description: "Commit and push to the current branch"
+  - label: "Edit message", description: "Modify the commit message before committing"
 
 **Important:** Always count and display the total number of files staged. Use `git diff --cached --name-only | wc -l` to get the count.
 
@@ -197,19 +223,27 @@ Pushed to: <branch>
 
 After user reviews the message:
 
-**If user approves:**
+**If user selects "Commit":**
 - Execute: `git commit -m "<type>[scope]: <description>"`
 - Do not include `Co-Authored-By` footer
 - Confirm with: `git log -1 --pretty=%B`
 
-**If user provides different message:**
-- Use their message exactly as provided
+**If user selects "Commit and push":**
+- Execute: `git commit -m "<type>[scope]: <description>"`
+- Then execute: `git push`
 - Do not include `Co-Authored-By` footer
+- Confirm with: `git log -1 --pretty=%B`
+- Display: "Pushed to: <branch>"
 
-**If user requests changes:**
-- Regenerate message with requested modifications
-- Present new message for review
+**If user selects "Edit message":**
+- Ask the user for their modifications or the new message
+- Regenerate or adjust the message based on their input
+- Present new message for review using `AskUserQuestion` again (same format as step 7)
 - Wait for approval again
+
+**If user selects "Other":**
+- Follow the user's custom text instructions
+- This may be a different commit message, a request to cancel, or other direction
 
 ## Edge Cases
 
